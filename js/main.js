@@ -190,4 +190,91 @@
     const roundedYears = Math.floor(rawYears / 5) * 5;
     yearsCounter.textContent = `${roundedYears}+`;
   }
+
+  /* ============================================
+     8. Округлення довільних статистичних чисел
+     донизу до кратного 5. Помічаємо елементи
+     атрибутом data-round-floor5.
+     14 → 10+, 15+ → 15+, 27 → 25+ і т.д.
+     ============================================ */
+  document.querySelectorAll('[data-round-floor5]').forEach((el) => {
+    const match = el.textContent.match(/(\d+)/);
+    if (!match) return;
+    const num = parseInt(match[1], 10);
+    const rounded = Math.floor(num / 5) * 5;
+    el.textContent = `${rounded}+`;
+  });
+
+  /* ============================================
+     9. Count-up анімація для Hero-статистики
+     Запускається коли блок з'являється в полі зору.
+     Поважає prefers-reduced-motion.
+     ============================================ */
+  const statValues = document.querySelectorAll('.hero__stat-value');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (statValues.length > 0 && 'IntersectionObserver' in window && !prefersReducedMotion) {
+    // Зберігаємо цільове значення і чи має суфікс "+"
+    const targets = Array.from(statValues).map((el) => {
+      const text = el.textContent.trim();
+      const match = text.match(/(\d+)/);
+      const target = match ? parseInt(match[1], 10) : 0;
+      const hasPlus = text.includes('+');
+      return { el, target, hasPlus, animated: false };
+    });
+
+    // Стартові значення — показуємо "0" одразу, щоб уникнути миготіння
+    targets.forEach((t) => {
+      t.el.textContent = t.hasPlus ? '0+' : '0';
+    });
+
+    // easeOutQuart — швидкий старт, плавне завершення
+    const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+
+    const animateCount = (item) => {
+      if (item.animated) return;
+      item.animated = true;
+
+      const duration = 1600; // 1.6 секунди
+      const start = performance.now();
+
+      const tick = (now) => {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeOutQuart(progress);
+        const current = Math.round(item.target * eased);
+        item.el.textContent = item.hasPlus ? `${current}+` : `${current}`;
+
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          // Фінальне значення — гарантовано точне
+          item.el.textContent = item.hasPlus ? `${item.target}+` : `${item.target}`;
+        }
+      };
+
+      requestAnimationFrame(tick);
+    };
+
+    // Спостерігаємо за контейнером hero__stats — анімуємо всі цифри разом
+    const statsContainer = document.querySelector('.hero__stats');
+    if (statsContainer) {
+      const statsObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              targets.forEach((item, idx) => {
+                // Невелика затримка між цифрами для каскадного ефекту
+                setTimeout(() => animateCount(item), idx * 120);
+              });
+              statsObserver.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.4 }
+      );
+
+      statsObserver.observe(statsContainer);
+    }
+  }
 })();
