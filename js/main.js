@@ -179,12 +179,15 @@
 
   /* ============================================
      7. Лічильник років досвіду (динамічно)
+     Округлюється донизу до найближчого кратного 5:
+     20–24 → 20+, 25–29 → 25+ і т.д.
      ============================================ */
   const yearsCounter = document.querySelector('[data-years-since]');
   if (yearsCounter) {
     const startYear = parseInt(yearsCounter.dataset.yearsSince, 10);
     const currentYear = new Date().getFullYear();
-    const years = currentYear - startYear;
-    yearsCounter.textContent = `${years}+`;
+    const rawYears = currentYear - startYear;
+    const roundedYears = Math.floor(rawYears / 5) * 5;
+    yearsCounter.textContent = `${roundedYears}+`;
   }
 })();
