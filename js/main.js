@@ -235,7 +235,7 @@
       if (item.animated) return;
       item.animated = true;
 
-      const duration = 1600; // 1.6 секунди
+      const duration = 2200; // 2.2 секунди — комфортна тривалість для ока
       const start = performance.now();
 
       const tick = (now) => {
@@ -259,22 +259,37 @@
     // Спостерігаємо за контейнером hero__stats — анімуємо всі цифри разом
     const statsContainer = document.querySelector('.hero__stats');
     if (statsContainer) {
-      const statsObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              targets.forEach((item, idx) => {
-                // Невелика затримка між цифрами для каскадного ефекту
-                setTimeout(() => animateCount(item), idx * 120);
-              });
-              statsObserver.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold: 0.4 }
-      );
+      const startAnimations = () => {
+        targets.forEach((item, idx) => {
+          // Каскадний ефект — кожне число стартує з затримкою
+          setTimeout(() => animateCount(item), idx * 200);
+        });
+      };
 
-      statsObserver.observe(statsContainer);
+      // Якщо вже в полі зору на момент завантаження — даємо хоча б 600мс
+      // на те, щоб користувач побачив сторінку, перш ніж стартувати анімацію
+      const rect = statsContainer.getBoundingClientRect();
+      const alreadyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+
+      if (alreadyVisible) {
+        // Чекаємо завершення CSS fadeInUp (0.4s delay + 0.7s duration = 1.1s)
+        // + невеличкий буфер, щоб користувач устиг побачити стартовий "0"
+        setTimeout(startAnimations, 1200);
+      } else {
+        // Якщо нижче — чекаємо на скрол
+        const statsObserver = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                startAnimations();
+                statsObserver.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.2 }
+        );
+        statsObserver.observe(statsContainer);
+      }
     }
   }
 })();
