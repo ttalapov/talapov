@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docker — Конспект лекції</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #0a0d12;
+      --surface:   #111520;
+      --border:    #1e2535;
+      --accent:    #00d4ff;
+      --accent2:   #7c3aed;
+      --green:     #22c55e;
+      --yellow:    #f59e0b;
+      --red:       #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --code-bg:   #0d1117;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── PROGRESS BAR ── */
+    #progress {
+      position: fixed; top: 0; left: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      z-index: 100; transition: width .1s linear;
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    /* ── SIDEBAR TOC ── */
+    #toc {
+      position: fixed; top: 50%; left: 0;
+      transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 12px 0 12px 16px; z-index: 50;
+    }
+    #toc a {
+      display: block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--border);
+      transition: all .3s; text-decoration: none;
+    }
+    #toc a.active, #toc a:hover {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      transform: scale(1.6);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 6rem 2rem 4rem;
+      max-width: 900px; margin: 0 auto;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0, 212, 255, .08);
+      border: 1px solid rgba(0, 212, 255, .2);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; padding: 6px 14px;
+      border-radius: 100px; margin-bottom: 2rem;
+      animation: fadeUp .6s ease both;
+    }
+    .hero-badge::before { content: '▶'; font-size: .6rem; }
+
+    h1 {
+      font-size: clamp(2.8rem, 8vw, 6rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -2px;
+      animation: fadeUp .7s .1s ease both;
+    }
+
+    h1 span {
+      display: block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-sub {
+      margin-top: 1.5rem;
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 520px;
+      animation: fadeUp .7s .2s ease both;
+    }
+
+    .hero-meta {
+      margin-top: 2.5rem;
+      display: flex; flex-wrap: wrap; gap: 1rem;
+      animation: fadeUp .7s .3s ease both;
+    }
+    .meta-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 16px; border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem; color: var(--muted);
+    }
+    .meta-chip strong { color: var(--text); }
+
+    .hero-scroll {
+      position: absolute; bottom: 3rem; left: 2rem;
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); font-size: .8rem;
+      font-family: 'JetBrains Mono', monospace;
+      animation: fadeUp .7s .5s ease both;
+    }
+    .scroll-line {
+      width: 40px; height: 1px; background: var(--border);
+      position: relative; overflow: hidden;
+    }
+    .scroll-line::after {
+      content: '';
+      position: absolute; top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: var(--accent);
+      animation: slide 1.5s infinite;
+    }
+    @keyframes slide { to { left: 100%; } }
+
+    /* ── GRID BACKGROUND HERO ── */
+    .hero::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black, transparent);
+    }
+
+    /* ── MAIN LAYOUT ── */
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 2rem 8rem;
+    }
+
+    /* ── SECTIONS ── */
+    section {
+      margin-bottom: 5rem;
+      opacity: 0; transform: translateY(30px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    section.visible { opacity: 1; transform: none; }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem; color: var(--accent);
+      letter-spacing: 3px; text-transform: uppercase;
+      margin-bottom: .75rem;
+    }
+
+    h2 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -1px;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    h2::after {
+      content: '';
+      display: block; height: 2px; width: 48px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      margin-top: .6rem;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 2rem 0 .75rem;
+    }
+
+    p { color: var(--muted); margin-bottom: 1rem; }
+    p strong { color: var(--text); }
+
+    /* ── CARDS ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: border-color .3s, transform .3s;
+    }
+    .card:hover {
+      border-color: rgba(0, 212, 255, .3);
+      transform: translateY(-3px);
+    }
+
+    .card-icon {
+      font-size: 1.8rem;
+      margin-bottom: .75rem;
+    }
+
+    .card h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: .5rem;
+    }
+
+    .card p { font-size: .9rem; margin: 0; }
+
+    /* ── CODE BLOCKS ── */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 1.5rem 0;
+    }
+
+    .code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+    }
+
+    .code-dots {
+      display: flex; gap: 6px;
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .dot-r { background: var(--red); }
+    .dot-y { background: var(--yellow); }
+    .dot-g { background: var(--green); }
+
+    .code-filename {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; color: var(--muted);
+    }
+
+    .copy-btn {
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem; padding: 4px 10px;
+      border-radius: 6px; transition: all .2s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85rem; line-height: 1.7;
+    }
+
+    .kw  { color: #ff7b72; }
+    .str { color: #a5d6ff; }
+    .cm  { color: #4a5568; font-style: italic; }
+    .fn  { color: #d2a8ff; }
+    .num { color: #f5c342; }
+    .val { color: var(--green); }
+
+    /* ── INLINE CODE ── */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .85em;
+      background: rgba(0,212,255,.07);
+      border: 1px solid rgba(0,212,255,.15);
+      padding: 2px 7px; border-radius: 5px;
+      color: var(--accent);
+    }
+
+    /* ── ALERT BOXES ── */
+    .alert {
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+      border-left: 3px solid;
+      font-size: .92rem;
+    }
+    .alert-info  { background: rgba(0,212,255,.05);  border-color: var(--accent);  color: #93c5fd; }
+    .alert-warn  { background: rgba(245,158,11,.05); border-color: var(--yellow); color: #fcd34d; }
+    .alert-tip   { background: rgba(34,197,94,.05);  border-color: var(--green);  color: #86efac; }
+    .alert strong { display: block; margin-bottom: .25rem; }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; margin: 1.5rem 0; }
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: .9rem;
+    }
+    th, td {
+      padding: .75rem 1rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+    th {
+      background: var(--surface);
+      font-weight: 600; color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem; letter-spacing: .5px;
+    }
+    td { color: var(--muted); }
+    tr:hover td { background: rgba(255,255,255,.015); }
+
+    /* ── LIST ── */
+    ul, ol {
+      color: var(--muted); padding-left: 1.4rem;
+      margin-bottom: 1rem;
+    }
+    li { margin-bottom: .4rem; }
+    li::marker { color: var(--accent); }
+
+    /* ── NUMBERED STEPS ── */
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps li {
+      counter-increment: step;
+      position: relative;
+      padding: 1.25rem 1.25rem 1.25rem 4rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: .75rem;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute; left: 1.25rem; top: 1.25rem;
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem; font-weight: 700;
+      color: #000;
+    }
+    .steps li strong { color: var(--text); display: block; margin-bottom: .25rem; }
+
+    /* ── DIAGRAM ── */
+    .diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 1.5rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      overflow-x: auto;
+    }
+
+    .diagram-row {
+      display: flex; align-items: center;
+      flex-wrap: wrap; gap: .5rem;
+      margin-bottom: .5rem;
+    }
+
+    .d-box {
+      border: 1px solid;
+      padding: .4rem .8rem;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .d-host  { border-color: var(--muted);  color: var(--muted); }
+    .d-eng   { border-color: var(--accent); color: var(--accent); }
+    .d-img   { border-color: var(--accent2); color: #c4b5fd; }
+    .d-cnt   { border-color: var(--green);  color: var(--green); }
+    .d-vol   { border-color: var(--yellow); color: var(--yellow); }
+    .d-net   { border-color: #f472b6; color: #f472b6; }
+    .arrow   { color: var(--muted); }
+
+    /* ── PRACTICE SECTION ── */
+    .practice-header {
+      background: linear-gradient(135deg,
+        rgba(0,212,255,.08) 0%,
+        rgba(124,58,237,.08) 100%
+      );
+      border: 1px solid rgba(0,212,255,.2);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .practice-header h2 { margin-bottom: .5rem; }
+    .practice-header h2::after { display: none; }
+
+    .task-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+
+    .task-header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+    }
+
+    .task-num {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #000;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: .8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    .task-title { font-weight: 600; font-size: 1rem; }
+
+    .task-body { padding: 1.25rem 1.5rem; }
+    .task-body p { font-size: .92rem; }
+
+    .diff-badge {
+      margin-left: auto;
+      font-size: .7rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 10px; border-radius: 100px;
+    }
+    .diff-easy   { background: rgba(34,197,94,.1);  color: var(--green);  border: 1px solid rgba(34,197,94,.2); }
+    .diff-medium { background: rgba(245,158,11,.1); color: var(--yellow); border: 1px solid rgba(245,158,11,.2); }
+    .diff-hard   { background: rgba(239,68,68,.1);  color: var(--red);    border: 1px solid rgba(239,68,68,.2); }
+
+    /* ── FOOTER ── */
+    footer {
+      max-width: 900px; margin: 0 auto;
+      padding: 2rem 2rem 4rem;
+      border-top: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; justify-content: space-between;
+      align-items: center; gap: 1rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .75rem;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      #toc { display: none; }
+      .hero { padding: 5rem 1.25rem 3rem; }
+      main  { padding: 0 1.25rem 5rem; }
+      .diagram-row { font-size: .72rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<!-- Sidebar TOC dots -->
+<nav id="toc" aria-label="Зміст">
+  <a href="#intro"      title="Вступ"></a>
+  <a href="#concepts"   title="Концепції"></a>
+  <a href="#arch"       title="Архітектура"></a>
+  <a href="#commands"   title="Команди"></a>
+  <a href="#dockerfile" title="Dockerfile"></a>
+  <a href="#compose"    title="Compose"></a>
+  <a href="#network"    title="Мережа"></a>
+  <a href="#practice"   title="Практика"></a>
+</nav>
+
+<!-- ══════════════════════ HERO ══════════════════════ -->
+<header class="hero">
+  <div class="hero-badge">Лекція · DevOps · Контейнеризація</div>
+  <h1>
+    Контейнеризація
+    <span>з Docker</span>
+  </h1>
+  <p class="hero-sub">
+    Від базових концепцій до production-готових контейнерів.
+    Повний конспект із прикладами та практичним завданням.
+  </p>
+  <div class="hero-meta">
+    <div class="meta-chip">Рівень: <strong>Beginner → Intermediate</strong></div>
+    <div class="meta-chip">Час: <strong>~2 год теорії</strong></div>
+    <div class="meta-chip">Практика: <strong>~90 хв</strong></div>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    scroll down
+  </div>
+</header>
+
+<!-- ══════════════════════ MAIN ══════════════════════ -->
+<main>
+
+  <!-- 1. ВСТУП -->
+  <section id="intro">
+    <div class="section-label">// 01</div>
+    <h2>Що таке Docker?</h2>
+
+    <p>
+      <strong>Docker</strong> — це платформа для розробки, доставки та запуску застосунків у
+      <strong>контейнерах</strong>. Контейнер — ізольоване середовище, що містить усе необхідне
+      для роботи застосунку: код, runtime, бібліотеки, змінні оточення.
+    </p>
+
+    <div class="alert alert-info">
+      <strong>💡 Ключова ідея</strong>
+      "Build once, run anywhere" — зібрав один раз, запускай будь-де: на ноутбуці, сервері, у хмарі.
+    </div>
+
+    <h3>Docker vs Віртуальна машина</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Критерій</th>
+            <th>Віртуальна машина</th>
+            <th>Docker-контейнер</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Ізоляція</td><td>Повна (окремий OS)</td><td>Процесна (спільне ядро)</td></tr>
+          <tr><td>Запуск</td><td>Хвилини</td><td>Секунди / мілісекунди</td></tr>
+          <tr><td>Розмір</td><td>Гігабайти</td><td>Мегабайти</td></tr>
+          <tr><td>Продуктивність</td><td>Overhead гіпервізора</td><td>Майже нативна</td></tr>
+          <tr><td>Портабельність</td><td>Середня</td><td>Висока</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Навіщо Docker розробнику?</h3>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">🔁</div>
+        <h4>Відтворюваність</h4>
+        <p>Однакове середовище на всіх машинах. Більше немає "у мене працює".</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚀</div>
+        <h4>Швидкий деплой</h4>
+        <p>CI/CD пайплайни збирають образи і деплоять секунди.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <h4>Ізоляція залежностей</h4>
+        <p>Node 18 для одного сервісу, Node 20 — для іншого. Без конфліктів.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔧</div>
+        <h4>Мікросервіси</h4>
+        <p>Ідеальна основа для мікросервісної архітектури та оркестрації.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. КОНЦЕПЦІЇ -->
+  <section id="concepts">
+    <div class="section-label">// 02</div>
+    <h2>Ключові концепції</h2>
+
+    <h3>Image (Образ)</h3>
+    <p>
+      <strong>Docker Image</strong> — шаблон лише для читання з набором шарів файлової системи.
+      Образ описує стан застосунку: ОС, залежності, файли, команди. Образи зберігаються у реєстрах
+      (Docker Hub, GitHub Container Registry, AWS ECR).
+    </p>
+
+    <h3>Container (Контейнер)</h3>
+    <p>
+      <strong>Контейнер</strong> — запущений екземпляр образу. Можна запустити кілька контейнерів
+      з одного образу. Контейнер має власний filesystem, мережу та процеси, але ділить ядро ОС з хостом.
+    </p>
+
+    <h3>Registry (Реєстр)</h3>
+    <p>
+      Сховище образів. <strong>Docker Hub</strong> — публічний реєстр за замовчуванням.
+      Образи мають теги: <code>nginx:latest</code>, <code>node:20-alpine</code>.
+    </p>
+
+    <h3>Volume (Том)</h3>
+    <p>
+      Механізм <strong>персистентного зберігання</strong> даних поза lifecycle контейнера.
+      Дані у volume живуть після зупинки чи видалення контейнера.
+    </p>
+
+    <h3>Network (Мережа)</h3>
+    <p>
+      Docker має власний networking. Контейнери в одній мережі можуть спілкуватися за іменем.
+      Основні драйвери: <code>bridge</code>, <code>host</code>, <code>overlay</code>.
+    </p>
+
+    <!-- Діаграма -->
+    <div class="diagram">
+      <div style="color: var(--muted); margin-bottom: 1rem;">── Архітектура Docker ──</div>
+      <div class="diagram-row">
+        <div class="d-box d-host">🖥 Host OS</div>
+        <span class="arrow">───▶</span>
+        <div class="d-box d-eng">Docker Engine</div>
+        <span class="arrow">───▶</span>
+        <div class="d-box d-img">📦 Image</div>
+        <span class="arrow">───▶</span>
+        <div class="d-box d-cnt">▶ Container 1</div>
+      </div>
+      <div class="diagram-row" style="margin-left: 14rem;">
+        <div class="d-box d-cnt">▶ Container 2</div>
+        <span class="arrow">──</span>
+        <div class="d-box d-vol">💾 Volume</div>
+      </div>
+      <div class="diagram-row" style="margin-left: 14rem;">
+        <div class="d-box d-cnt">▶ Container 3</div>
+        <span class="arrow">──</span>
+        <div class="d-box d-net">🌐 Network</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. АРХІТЕКТУРА -->
+  <section id="arch">
+    <div class="section-label">// 03</div>
+    <h2>Архітектура Docker</h2>
+
+    <p>Docker використовує <strong>клієнт-серверну архітектуру</strong>:</p>
+
+    <ul>
+      <li><strong>Docker Client</strong> (<code>docker</code>) — CLI, який ти використовуєш. Надсилає команди до daemon.</li>
+      <li><strong>Docker Daemon</strong> (<code>dockerd</code>) — фоновий процес, що управляє образами, контейнерами, мережами та томами.</li>
+      <li><strong>Docker Registry</strong> — зберігає та роздає образи. За замовчуванням — Docker Hub.</li>
+      <li><strong>containerd</strong> — низькорівневий runtime для управління lifecycle контейнерів.</li>
+    </ul>
+
+    <div class="alert alert-tip">
+      <strong>✅ Запам'ятай</strong>
+      Lifecycle контейнера: <strong>create → start → running → stop → remove</strong>.
+      Образ — незмінний. Контейнер — запущений примірник з власним writable шаром.
+    </div>
+
+    <h3>Шари образу (Union File System)</h3>
+    <p>
+      Кожна інструкція у Dockerfile створює <strong>окремий шар</strong>. Шари кешуються та
+      перевикористовуються — це робить збірку і завантаження образів ефективними.
+    </p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">Шари образу (логічно)</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm">┌────────────────────────────────────┐  ← Writable Container Layer</span>
+<span class="cm">├────────────────────────────────────┤</span>
+<span class="val">│  COPY . .                          │  ← Layer 4 (Ваш код)</span>
+<span class="cm">├────────────────────────────────────┤</span>
+<span class="val">│  RUN npm install                   │  ← Layer 3 (npm deps)</span>
+<span class="cm">├────────────────────────────────────┤</span>
+<span class="val">│  COPY package*.json ./             │  ← Layer 2</span>
+<span class="cm">├────────────────────────────────────┤</span>
+<span class="val">│  FROM node:20-alpine               │  ← Layer 1 (base image)</span>
+<span class="cm">└────────────────────────────────────┘</span>
+</pre>
+    </div>
+
+    <div class="alert alert-warn">
+      <strong>⚠️ Важливо для кешування</strong>
+      Зміна шару інвалідує всі наступні шари. Тому спочатку копіюємо <code>package.json</code>,
+      встановлюємо залежності, і лише потім копіюємо код — так <code>npm install</code> кешується.
+    </div>
+  </section>
+
+  <!-- 4. КОМАНДИ -->
+  <section id="commands">
+    <div class="section-label">// 04</div>
+    <h2>Основні команди</h2>
+
+    <h3>Робота з образами</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">terminal</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm"># Завантажити образ</span>
+<span class="fn">docker pull</span> <span class="str">nginx:latest</span>
+
+<span class="cm"># Список локальних образів</span>
+<span class="fn">docker images</span>
+
+<span class="cm"># Зібрати образ з Dockerfile</span>
+<span class="fn">docker build</span> <span class="kw">-t</span> myapp:<span class="num">1.0</span> <span class="str">.</span>
+
+<span class="cm"># Видалити образ</span>
+<span class="fn">docker rmi</span> myapp:<span class="num">1.0</span>
+
+<span class="cm"># Інспектувати образ</span>
+<span class="fn">docker inspect</span> nginx:latest</pre>
+    </div>
+
+    <h3>Робота з контейнерами</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">terminal</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm"># Запустити контейнер (foreground)</span>
+<span class="fn">docker run</span> nginx
+
+<span class="cm"># Запустити у фоні (-d) з іменем та портом</span>
+<span class="fn">docker run</span> <span class="kw">-d</span> <span class="kw">--name</span> web <span class="kw">-p</span> <span class="num">8080</span>:<span class="num">80</span> nginx
+
+<span class="cm"># Інтерактивний shell у контейнері</span>
+<span class="fn">docker exec</span> <span class="kw">-it</span> web <span class="str">/bin/sh</span>
+
+<span class="cm"># Список запущених контейнерів</span>
+<span class="fn">docker ps</span>
+
+<span class="cm"># Список усіх контейнерів (включно зі зупиненими)</span>
+<span class="fn">docker ps</span> <span class="kw">-a</span>
+
+<span class="cm"># Логи контейнера (live stream)</span>
+<span class="fn">docker logs</span> <span class="kw">-f</span> web
+
+<span class="cm"># Зупинити / видалити контейнер</span>
+<span class="fn">docker stop</span> web
+<span class="fn">docker rm</span> web</pre>
+    </div>
+
+    <h3>Томи та мережі</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">terminal</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm"># Монтування volume</span>
+<span class="fn">docker run</span> <span class="kw">-v</span> mydata:<span class="str">/app/data</span> myapp
+
+<span class="cm"># Bind mount (локальна директорія)</span>
+<span class="fn">docker run</span> <span class="kw">-v</span> $(pwd):<span class="str">/app</span> myapp
+
+<span class="cm"># Управління мережами</span>
+<span class="fn">docker network create</span> mynet
+<span class="fn">docker run</span> <span class="kw">--network</span> mynet myapp
+
+<span class="cm"># Очистка всього невикористаного</span>
+<span class="fn">docker system prune</span> <span class="kw">-a</span></pre>
+    </div>
+  </section>
+
+  <!-- 5. DOCKERFILE -->
+  <section id="dockerfile">
+    <div class="section-label">// 05</div>
+    <h2>Dockerfile</h2>
+
+    <p>
+      <strong>Dockerfile</strong> — текстовий файл з інструкціями для побудови образу.
+      Кожна інструкція виконується у окремому шарі.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Інструкція</th><th>Опис</th><th>Приклад</th></tr></thead>
+        <tbody>
+          <tr><td><code>FROM</code></td><td>Базовий образ</td><td><code>FROM node:20-alpine</code></td></tr>
+          <tr><td><code>WORKDIR</code></td><td>Робоча директорія</td><td><code>WORKDIR /app</code></td></tr>
+          <tr><td><code>COPY</code></td><td>Копіювати файли</td><td><code>COPY . .</code></td></tr>
+          <tr><td><code>RUN</code></td><td>Виконати команду (під час build)</td><td><code>RUN npm install</code></td></tr>
+          <tr><td><code>ENV</code></td><td>Змінна оточення</td><td><code>ENV NODE_ENV=production</code></td></tr>
+          <tr><td><code>EXPOSE</code></td><td>Документує порт</td><td><code>EXPOSE 3000</code></td></tr>
+          <tr><td><code>CMD</code></td><td>Команда за замовчуванням (run-time)</td><td><code>CMD ["node", "index.js"]</code></td></tr>
+          <tr><td><code>ENTRYPOINT</code></td><td>Точка входу</td><td><code>ENTRYPOINT ["node"]</code></td></tr>
+          <tr><td><code>ARG</code></td><td>Build-time аргумент</td><td><code>ARG VERSION=1.0</code></td></tr>
+          <tr><td><code>HEALTHCHECK</code></td><td>Перевірка здоров'я</td><td><code>HEALTHCHECK CMD curl -f http://localhost/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Production-ready Dockerfile для Node.js</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">Dockerfile</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm"># ── Stage 1: deps ──────────────────────────────────────</span>
+<span class="kw">FROM</span> node:<span class="num">20</span>-alpine <span class="kw">AS</span> deps
+<span class="kw">WORKDIR</span> <span class="str">/app</span>
+
+<span class="cm"># Копіюємо лише package файли (кешування!)</span>
+<span class="kw">COPY</span> package*.json ./
+<span class="kw">RUN</span> npm ci --only=production
+
+<span class="cm"># ── Stage 2: build ─────────────────────────────────────</span>
+<span class="kw">FROM</span> node:<span class="num">20</span>-alpine <span class="kw">AS</span> build
+<span class="kw">WORKDIR</span> <span class="str">/app</span>
+<span class="kw">COPY</span> package*.json ./
+<span class="kw">RUN</span> npm ci
+<span class="kw">COPY</span> . .
+<span class="kw">RUN</span> npm run build
+
+<span class="cm"># ── Stage 3: runtime ───────────────────────────────────</span>
+<span class="kw">FROM</span> node:<span class="num">20</span>-alpine <span class="kw">AS</span> runtime
+<span class="kw">WORKDIR</span> <span class="str">/app</span>
+
+<span class="cm"># Не запускати як root</span>
+<span class="kw">RUN</span> addgroup -S appgroup <span class="kw">&&</span> adduser -S appuser -G appgroup
+<span class="kw">USER</span> appuser
+
+<span class="kw">COPY</span> --from=deps  /app/node_modules ./node_modules
+<span class="kw">COPY</span> --from=build /app/dist        ./dist
+
+<span class="kw">ENV</span> NODE_ENV=<span class="str">production</span>
+<span class="kw">ENV</span> PORT=<span class="num">3000</span>
+
+<span class="kw">EXPOSE</span> <span class="num">3000</span>
+
+<span class="kw">HEALTHCHECK</span> --interval=<span class="num">30s</span> --timeout=<span class="num">3s</span> \
+  <span class="kw">CMD</span> wget -qO- http://localhost:<span class="num">3000</span>/health || exit <span class="num">1</span>
+
+<span class="kw">CMD</span> [<span class="str">"node"</span>, <span class="str">"dist/index.js"</span>]</pre>
+    </div>
+
+    <div class="alert alert-tip">
+      <strong>✅ Multi-stage build</strong>
+      Multi-stage build дозволяє зменшити фінальний образ — dev-залежності та build-артефакти
+      не потрапляють в production image. Типовий образ зменшується з ~1GB до ~100MB.
+    </div>
+
+    <h3>.dockerignore</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">.dockerignore</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+node_modules
+.git
+.gitignore
+*.md
+.env
+.env.local
+dist
+coverage
+.DS_Store</pre>
+    </div>
+  </section>
+
+  <!-- 6. DOCKER COMPOSE -->
+  <section id="compose">
+    <div class="section-label">// 06</div>
+    <h2>Docker Compose</h2>
+
+    <p>
+      <strong>Docker Compose</strong> — інструмент для визначення та запуску
+      <strong>багатоконтейнерних застосунків</strong> через один YAML-файл.
+      Ідеальний для локального розробницького середовища.
+    </p>
+
+    <h3>Типовий стек: Node.js + PostgreSQL + Redis</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">docker-compose.yml</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="kw">version:</span> <span class="str">"3.9"</span>
+
+<span class="kw">services:</span>
+
+  <span class="fn">app:</span>
+    <span class="kw">build:</span> .
+    <span class="kw">ports:</span>
+      - <span class="str">"3000:3000"</span>
+    <span class="kw">environment:</span>
+      - DATABASE_URL=postgresql://user:pass@db:<span class="num">5432</span>/mydb
+      - REDIS_URL=redis://redis:<span class="num">6379</span>
+    <span class="kw">depends_on:</span>
+      db:
+        <span class="kw">condition:</span> service_healthy
+      redis:
+        <span class="kw">condition:</span> service_started
+    <span class="kw">volumes:</span>
+      - .:/app                    <span class="cm"># hot-reload у розробці</span>
+      - /app/node_modules         <span class="cm"># анонімний volume для modules</span>
+    <span class="kw">networks:</span>
+      - internal
+
+  <span class="fn">db:</span>
+    <span class="kw">image:</span> <span class="str">postgres:16-alpine</span>
+    <span class="kw">environment:</span>
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mydb
+    <span class="kw">volumes:</span>
+      - pgdata:/var/lib/postgresql/data
+    <span class="kw">healthcheck:</span>
+      <span class="kw">test:</span> [<span class="str">"CMD-SHELL"</span>, <span class="str">"pg_isready -U user"</span>]
+      <span class="kw">interval:</span> <span class="num">5s</span>
+      <span class="kw">retries:</span> <span class="num">5</span>
+    <span class="kw">networks:</span>
+      - internal
+
+  <span class="fn">redis:</span>
+    <span class="kw">image:</span> <span class="str">redis:7-alpine</span>
+    <span class="kw">networks:</span>
+      - internal
+
+<span class="kw">volumes:</span>
+  pgdata:
+
+<span class="kw">networks:</span>
+  internal:
+    <span class="kw">driver:</span> bridge</pre>
+    </div>
+
+    <h3>Основні Compose-команди</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">terminal</span>
+        <button class="copy-btn" onclick="copy(this)">copy</button>
+      </div>
+      <pre>
+<span class="cm"># Запустити всі сервіси у фоні</span>
+<span class="fn">docker compose up</span> <span class="kw">-d</span>
+
+<span class="cm"># Зупинити і видалити контейнери</span>
+<span class="fn">docker compose down</span>
+
+<span class="cm"># Зупинити + видалити volumes</span>
+<span class="fn">docker compose down</span> <span class="kw">-v</span>
+
+<span class="cm"># Перебудувати образ і запустити</span>
+<span class="fn">docker compose up</span> <span class="kw">--build</span>
+
+<span class="cm"># Логи конкретного сервісу</span>
+<span class="fn">docker compose logs</span> <span class="kw">-f</span> app
+
+<span class="cm"># Запустити команду всередині сервісу</span>
+<span class="fn">docker compose exec</span> db psql <span class="kw">-U</span> user mydb</pre>
+    </div>
+  </section>
+
+  <!-- 7. МЕРЕЖА -->
+  <section id="network">
+    <div class="section-label">// 07</div>
+    <h2>Мережа та безпека</h2>
+
+    <h3>Типи мереж</h3>
+    <div class="card-grid">
+      <div class="card">
+        <h4>bridge</h4>
+        <p>За замовчуванням. Ізольована мережа на одному хості. Контейнери спілкуються за іменем.</p>
+      </div>
+      <div class="card">
+        <h4>host</h4>
+        <p>Контейнер ділить мережу з хостом. Максимальна продуктивність, мінімальна ізоляція.</p>
+      </div>
+      <div class="card">
+        <h4>overlay</h4>
+        <p>Для Docker Swarm / Kubernetes. З'єднує контейнери на різних хостах.</p>
+      </div>
+      <div class="card">
+        <h4>none</h4>
+        <p>Повна ізоляція. Контейнер без мережевого доступу.</p>
+      </div>
+    </div>
+
+    <h3>Best Practices безпеки</h3>
+    <ul>
+      <li>Не запускати контейнери від <strong>root</strong>-користувача — використовуй <code>USER</code></li>
+      <li>Використовуй <strong>офіційні minimal образи</strong> (<code>alpine</code>, <code>distroless</code>)</li>
+      <li>Регулярно оновлюй базові образи — стеж за CVE</li>
+      <li>Не зберігай <strong>секрети у Dockerfile</strong> або змінних оточення. Використовуй Docker Secrets або Vault</li>
+      <li>Обмежуй <strong>capabilities</strong>: <code>--cap-drop ALL</code></li>
+      <li>Read-only filesystem: <code>--read-only</code></li>
+      <li>Скануй образи: <code>docker scout cves</code> або <strong>Trivy</strong></li>
+    </ul>
+
+    <div class="alert alert-warn">
+      <strong>⚠️ Секрети у Docker</strong>
+      Ніколи не hardcode паролі та API ключі у Dockerfile або <code>docker-compose.yml</code>.
+      Використовуй <code>.env</code> файл (у .gitignore) або Docker Secrets для production.
+    </div>
+  </section>
+
+  <!-- 8. ПРАКТИКА -->
+  <section id="practice">
+    <div class="practice-header">
+      <div class="section-label">// 08</div>
+      <h2>🛠 Практичне заняття</h2>
+      <p style="color: var(--muted); margin-top: .5rem;">
+        Контейнеризація full-stack застосунку з нуля.
+        Час виконання: <strong style="color: var(--text);">~90 хвилин</strong>
+      </p>
+    </div>
+
+    <h3>Мета</h3>
+    <p>
+      Розгорнути застосунок <strong>Todo API</strong> (Node.js + Express + PostgreSQL)
+      у Docker-контейнерах з використанням Docker Compose.
+    </p>
+
+    <h3>Підготовка середовища</h3>
+    <ol class="steps">
+      <li>
+        <strong>Встановити Docker Desktop</strong>
+        Завантажити з <code>docs.docker.com/get-docker</code>. Перевірити: <code>docker --version</code> та <code>docker compose version</code>
+      </li>
+      <li>
+        <strong>Клонувати стартовий проєкт</strong>
+        <code>git clone https://github.com/your-org/docker-workshop-starter</code> або створити структуру вручну (дивись нижче)
+      </li>
+      <li>
+        <strong>Перевірити Docker daemon</strong>
+        <code>docker info</code> — має показати інформацію без помилок
+      </li>
+    </ol>
+
+    <h3>Структура проєкту</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">folder structure</span>
+      </div>
+      <pre>
+todo-app/
+├── <span class="fn">backend/</span>
+│   ├── <span class="str">src/</span>
+│   │   ├── index.js
+│   │   └── db.js
+│   ├── package.json
+│   └── <span class="kw">Dockerfile</span>          <span class="cm">← Задання 1</span>
+├── <span class="fn">frontend/</span>
+│   ├── index.html
+│   ├── app.js
+│   └── <span class="kw">Dockerfile</span>          <span class="cm">← Задання 2</span>
+├── <span class="fn">nginx/</span>
+│   └── nginx.conf            <span class="cm">← Задання 4</span>
+├── <span class="kw">docker-compose.yml</span>        <span class="cm">← Задання 3</span>
+└── <span class="kw">.env</span>                      <span class="cm">← Задання 3</span></pre>
+    </div>
+
+    <!-- TASK 1 -->
+    <div class="task-card">
+      <div class="task-header">
+        <span class="task-num">Завдання 1</span>
+        <span class="task-title">Dockerfile для Backend (Node.js)</span>
+        <span class="diff-badge diff-easy">easy</span>
+      </div>
+      <div class="task-body">
+        <p>Напишіть <code>backend/Dockerfile</code> за наступними вимогами:</p>
+        <ul>
+          <li>Базовий образ: <code>node:20-alpine</code></li>
+          <li>Робоча директорія: <code>/app</code></li>
+          <li>Спочатку копіювати <code>package*.json</code>, потім виконати <code>npm ci</code></li>
+          <li>Потім копіювати решту файлів</li>
+          <li>Expose порт <code>3000</code></li>
+          <li>CMD: <code>node src/index.js</code></li>
+        </ul>
+        <p><strong>Перевірка:</strong></p>
+        <div class="code-block" style="margin-top:.75rem">
+          <div class="code-header">
+            <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+            <span class="code-filename">terminal</span>
+            <button class="copy-btn" onclick="copy(this)">copy</button>
+          </div>
+          <pre>
+<span class="fn">docker build</span> <span class="kw">-t</span> todo-backend <span class="str">./backend</span>
+<span class="fn">docker run</span> <span class="kw">-p</span> <span class="num">3000</span>:<span class="num">3000</span> todo-backend
+<span class="cm"># http://localhost:3000/health → {"status":"ok"}</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK 2 -->
+    <div class="task-card">
+      <div class="task-header">
+        <span class="task-num">Завдання 2</span>
+        <span class="task-title">Dockerfile для Frontend (Nginx)</span>
+        <span class="diff-badge diff-easy">easy</span>
+      </div>
+      <div class="task-body">
+        <p>Напишіть <code>frontend/Dockerfile</code> для роздачі статики через Nginx:</p>
+        <ul>
+          <li>Базовий образ: <code>nginx:alpine</code></li>
+          <li>Скопіювати вміст директорії в <code>/usr/share/nginx/html</code></li>
+          <li>Expose порт <code>80</code></li>
+        </ul>
+        <div class="alert alert-tip" style="margin-top:1rem">
+          <strong>💡 Підказка</strong>
+          Для SPA (React/Vue) також потрібно налаштувати <code>try_files $uri /index.html</code>
+          у конфігурації nginx щоб client-side routing працював.
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK 3 -->
+    <div class="task-card">
+      <div class="task-header">
+        <span class="task-num">Завдання 3</span>
+        <span class="task-title">Docker Compose — повний стек</span>
+        <span class="diff-badge diff-medium">medium</span>
+      </div>
+      <div class="task-body">
+        <p>Напишіть <code>docker-compose.yml</code> з трьома сервісами:</p>
+        <ul>
+          <li><strong>db</strong> — PostgreSQL 16 з named volume і healthcheck</li>
+          <li><strong>backend</strong> — збирається з <code>./backend</code>, залежить від <code>db</code>, порт 3000</li>
+          <li><strong>frontend</strong> — збирається з <code>./frontend</code>, порт 80</li>
+        </ul>
+        <p>Усі три сервіси повинні бути в одній мережі <code>app-network</code>.</p>
+        <p>Секрети (<code>POSTGRES_PASSWORD</code>, <code>DATABASE_URL</code>) — винести у <code>.env</code> файл.</p>
+        <p><strong>Перевірка:</strong></p>
+        <div class="code-block" style="margin-top:.75rem">
+          <div class="code-header">
+            <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+            <span class="code-filename">terminal</span>
+            <button class="copy-btn" onclick="copy(this)">copy</button>
+          </div>
+          <pre>
+<span class="fn">docker compose up</span> <span class="kw">-d</span>
+<span class="fn">docker compose ps</span>
+<span class="cm"># Всі три сервіси: Status = running (healthy)</span>
+
+curl http://localhost:3000/api/todos   <span class="cm"># [] або список todos</span>
+curl http://localhost:80               <span class="cm"># HTML сторінка</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK 4 -->
+    <div class="task-card">
+      <div class="task-header">
+        <span class="task-num">Завдання 4 ⭐</span>
+        <span class="task-title">Nginx reverse proxy + Multi-stage</span>
+        <span class="diff-badge diff-hard">hard</span>
+      </div>
+      <div class="task-body">
+        <p>Додайте сервіс <strong>nginx</strong> як reverse proxy, який:</p>
+        <ul>
+          <li>Роздає статику фронтенду на <code>/</code></li>
+          <li>Проксіює <code>/api/*</code> на backend-контейнер</li>
+          <li>Додайте rate limiting: не більше 10 запитів/секунду</li>
+        </ul>
+        <p>Рефакторингу backend Dockerfile у <strong>multi-stage build</strong>:</p>
+        <ul>
+          <li>Stage 1 (<code>deps</code>): лише production залежності</li>
+          <li>Stage 2 (<code>runtime</code>): фінальний image на основі <code>node:20-alpine</code></li>
+          <li>Запуск від non-root користувача</li>
+        </ul>
+        <p><strong>Бонус:</strong> додайте <code>HEALTHCHECK</code> для backend.</p>
+        <div class="alert alert-info" style="margin-top:1rem">
+          <strong>🎯 Результат</strong>
+          Один порт <code>:80</code> для всього застосунку. Розмір backend image — менше 150MB.
+        </div>
+      </div>
+    </div>
+
+    <h3>Чекліст здачі</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-dots"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+        <span class="code-filename">checklist</span>
+      </div>
+      <pre>
+<span class="val">✓</span> <span class="str">docker compose up -d</span> запускається без помилок
+<span class="val">✓</span> <span class="str">docker compose ps</span>    — всі сервіси healthy
+<span class="val">✓</span> API відповідає на   <span class="str">http://localhost:3000/api/todos</span>
+<span class="val">✓</span> Frontend доступний на <span class="str">http://localhost:80</span>
+<span class="val">✓</span> Секрети НЕ hardcode — лише через .env
+<span class="val">✓</span> .dockerignore створений для backend і frontend
+<span class="val">✓</span> <span class="fn">[Бонус]</span> Multi-stage: image backend &lt; 150MB
+<span class="val">✓</span> <span class="fn">[Бонус]</span> Nginx reverse proxy на порті :80</pre>
+    </div>
+
+    <h3>Корисні ресурси</h3>
+    <div class="card-grid">
+      <div class="card">
+        <h4>📖 Офіційна документація</h4>
+        <p><code>docs.docker.com</code> — найкраще джерело. Є playground для практики онлайн.</p>
+      </div>
+      <div class="card">
+        <h4>🎓 Play with Docker</h4>
+        <p><code>labs.play-with-docker.com</code> — безкоштовне хмарне середовище на 4 години.</p>
+      </div>
+      <div class="card">
+        <h4>📦 Docker Hub</h4>
+        <p><code>hub.docker.com</code> — реєстр образів. Завжди шукай офіційні образи.</p>
+      </div>
+      <div class="card">
+        <h4>🔍 Dive</h4>
+        <p>Інструмент для аналізу шарів образу. <code>github.com/wagoodman/dive</code></p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>Docker · Конспект лекції · 2025</span>
+  <span>Рівень: Beginner → Intermediate</span>
+  <span>Зроблено з ❤️ для студентів</span>
+</footer>
+
+<script>
+  // Progress bar
+  const bar = document.getElementById('progress');
+  window.addEventListener('scroll', () => {
+    const p = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+    bar.style.width = (p * 100) + '%';
+  });
+
+  // TOC active dots
+  const sections = document.querySelectorAll('section[id]');
+  const dots = document.querySelectorAll('#toc a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id;
+        dots.forEach(d => {
+          d.classList.toggle('active', d.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { threshold: 0.35 });
+
+  sections.forEach(s => observer.observe(s));
+
+  // Section reveal
+  const revealObs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+
+  sections.forEach(s => revealObs.observe(s));
+
+  // Copy button
+  function copy(btn) {
+    const code = btn.closest('.code-block').querySelector('pre').innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.textContent = 'copied!';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
